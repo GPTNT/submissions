@@ -1,0 +1,14 @@
+[tools]
+python = "3.13"
+
+[env]
+# Pin to a released gptnt tag once `--format github` and the suites.lock
+# resolver have shipped. `main` is a placeholder, matching CI.
+GPTNT_REF = "main"
+
+[tasks.validate]
+description = "Validate a submission bundle locally, as CI does."
+usage = '''
+arg "<dir>" help="Path to the submission bundle directory"
+'''
+run = '''uvx --from "git+https://github.com/GPTNT/gptnt@$GPTNT_REF" gptnt submission validate "{{arg(name="dir")}}"'''

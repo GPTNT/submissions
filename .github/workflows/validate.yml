@@ -1,0 +1,98 @@
+# PR gate for leaderboard submissions.
+#
+# Every pull request that touches `submissions/**` is validated here. The job
+# diffs the PR against its base to find which submission bundles changed, then
+# runs `gptnt submission validate` on each. A bundle is one flat folder,
+# `submissions/YYYYMMDD_<display-slug>_<capfp8>_<suite>_<ver>/`, holding a
+# `submission.yaml` manifest plus its payload (`experiments.parquet` for
+# interactive runs, or `metrics.json` for statics). A PR may add more than one.
+#
+# The validator is pulled straight from the gptnt package with `uvx`, so this
+# repo carries no Python of its own. `GPTNT_REF` pins the gptnt version whose
+# `suites.lock` a submission is checked against; bump it only to accept a new
+# suite revision or a validate fix. It stays on `main` until a release is tagged.
+
+name: validate
+
+on:
+  pull_request:
+    paths:
+      - "submissions/**"
+
+concurrency:
+  group: validate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  # Pin to a released gptnt tag once one ships; `main` is the placeholder.
+  GPTNT_REF: main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+
+      - name: Detect changed submission bundles
+        id: detect
+        run: |
+          set -euo pipefail
+          base="origin/${{ github.base_ref }}"
+          bundles=""
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            # Skip deletions: only validate bundles that still exist.
+            [ -e "$path" ] || continue
+            # Walk up to the nearest ancestor holding a submission.yaml.
+            dir="$path"
+            [ -d "$dir" ] || dir="$(dirname "$dir")"
+            while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
+              if [ -f "$dir/submission.yaml" ]; then
+                bundles="$bundles$dir"$'\n'
+                break
+              fi
+              dir="$(dirname "$dir")"
+            done
+          done < <(git diff --name-only "$base"...HEAD -- 'submissions/**')
+
+          # Dedupe into a stable set, one bundle dir per line.
+          bundles="$(printf '%s' "$bundles" | sort -u | sed '/^$/d')"
+          if [ -z "$bundles" ]; then
+            echo "No submission bundles changed; nothing to validate."
+          else
+            echo "Changed bundles:"
+            printf '%s\n' "$bundles"
+          fi
+          {
+            echo "bundles<<EOF"
+            printf '%s\n' "$bundles"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Validate submissions
+        if: steps.detect.outputs.bundles != ''
+        run: |
+          set -euo pipefail
+          status=0
+          while IFS= read -r dir; do
+            [ -n "$dir" ] || continue
+            echo "::group::validate $dir"
+            if ! uvx --from "git+https://github.com/GPTNT/gptnt@${GPTNT_REF}" \
+              gptnt submission validate --format github "$dir"; then
+              status=1
+            fi
+            echo "::endgroup::"
+          done <<< "${{ steps.detect.outputs.bundles }}"
+          exit "$status"
