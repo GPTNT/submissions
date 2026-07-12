@@ -1,0 +1,44 @@
+schema_version: 1
+submission_id: 2026-02-20_internvl3-5-38b_248bc69d_single-parametric-sync@1
+measured:
+  suite_name: single-parametric-sync
+  suite_revision: 1
+  suite_digest: 5460034434039828c73292f7f3fc5867
+submitter:
+  name: Amit Parekh
+  contact: '@amitkparekh'
+  affiliation: GPTNT
+players:
+- role: defuser
+  capabilities:
+    player_name: internvl3-5-38b
+    player_type: ai
+    thinking_method: thinking-out-loud
+    structured_output_mode: null
+    include_schema_in_instructions: true
+    max_observations_per_request: 16
+    usage_limits:
+      request_limit: 50
+      tool_calls_limit: null
+      input_tokens_limit: 39959
+      output_tokens_limit: 1001
+      total_tokens_limit: null
+      count_tokens_before_request: false
+    image_dimensions:
+      width: 448
+      height: 448
+    tokens_per_image: 0
+    interaction_location_method: set-of-marks
+    coordinate_mode: normalised
+    preserve_last_frame_for_n_turns: 1
+    enable_nobf_generation: true
+  identity:
+    display_name: InternVL3.5 (38B)
+    organisation: OpenGVLab
+    is_os_model: true
+    url: https://huggingface.co/OpenGVLab/InternVL3_5-38B
+  fingerprint: 248bc69dc106de99551643c0bf61e55b
+provenance:
+  gptnt_version: 1.0.0
+  git_sha: null
+run_date: '2026-02-20T21:05:26.028505073Z'
