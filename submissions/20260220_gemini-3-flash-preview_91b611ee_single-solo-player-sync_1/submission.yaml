@@ -1,0 +1,44 @@
+schema_version: 1
+submission_id: 2026-02-20_gemini-3-flash-preview_91b611ee_single-solo-player-sync@1
+measured:
+  suite_name: single-solo-player-sync
+  suite_revision: 1
+  suite_digest: 125050b2dc2695dcc0fd887c2d1ad2eb
+submitter:
+  name: Amit Parekh
+  contact: '@amitkparekh'
+  affiliation: GPTNT
+players:
+- role: defuser
+  capabilities:
+    player_name: gemini-3-flash-preview
+    player_type: ai
+    thinking_method: thinking-out-loud
+    structured_output_mode: null
+    include_schema_in_instructions: true
+    max_observations_per_request: 16
+    usage_limits:
+      request_limit: 50
+      tool_calls_limit: null
+      input_tokens_limit: 1048576
+      output_tokens_limit: 65536
+      total_tokens_limit: null
+      count_tokens_before_request: false
+    image_dimensions:
+      width: 640
+      height: 480
+    tokens_per_image: 0
+    interaction_location_method: set-of-marks
+    coordinate_mode: normalised
+    preserve_last_frame_for_n_turns: 1
+    enable_nobf_generation: true
+  identity:
+    display_name: Gemini 3 Flash (Preview)
+    organisation: Google
+    is_os_model: false
+    url: https://deepmind.google/models/gemini/flash/
+  fingerprint: 91b611eeb644ed75a7dabd873473df7b
+provenance:
+  gptnt_version: 1.0.0
+  git_sha: null
+run_date: '2026-02-20T20:49:59.29042489Z'
