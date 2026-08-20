@@ -7,10 +7,9 @@
 # `submission.yaml` manifest plus its payload (`experiments.parquet` for
 # interactive runs, or `metrics.json` for statics). A PR may add more than one.
 #
-# The validator is pulled straight from the gptnt package with `uvx`, so this
-# repo carries no Python of its own. `GPTNT_REF` pins the gptnt version whose
-# `suites.lock` a submission is checked against; bump it only to accept a new
-# suite revision or a validate fix. It stays on `main` until a release is tagged.
+# Each manifest selects its GPTNT release. The helper requires that release to
+# be published, verifies its tar asset and embedded Git identity, then runs the
+# validator installed from that asset.
 
 name: validate
 
@@ -18,6 +17,10 @@ on:
   pull_request:
     paths:
       - "submissions/**"
+      - "scripts/validate_published_release.py"
+      - "tests/test_validate_published_release.py"
+      - "mise.toml"
+      - ".github/workflows/validate.yml"
 
 concurrency:
   group: validate-${{ github.event.pull_request.number }}
@@ -26,10 +29,6 @@ concurrency:
 permissions:
   contents: read
   pull-requests: write
-
-env:
-  # Pin to a released gptnt tag once one ships; `main` is the placeholder.
-  GPTNT_REF: main
 
 jobs:
   validate:
@@ -44,6 +43,9 @@ jobs:
         with:
           enable-cache: true
           python-version: "3.13"
+
+      - name: Test published-release validation
+        run: uv run --with pyyaml==6.0.2 python -m unittest discover -s tests
 
       - name: Detect changed submission bundles
         id: detect
@@ -83,14 +85,16 @@ jobs:
 
       - name: Validate submissions
         if: steps.detect.outputs.bundles != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           status=0
           while IFS= read -r dir; do
             [ -n "$dir" ] || continue
             echo "::group::validate $dir"
-            if ! uvx --from "git+https://github.com/GPTNT/gptnt@${GPTNT_REF}" \
-              gptnt submission validate --format github "$dir"; then
+            if ! uv run --with pyyaml==6.0.2 \
+              python scripts/validate_published_release.py "$dir"; then
               status=1
             fi
             echo "::endgroup::"
