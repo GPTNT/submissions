@@ -15,29 +15,64 @@ name: validate
 
 on:
   pull_request:
+    paths-ignore:
+      - "submissions/**"
+  # This job checks out protected-base code and treats the PR worktree only as bundle input.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
     paths:
       - "submissions/**"
-      - "scripts/validate_published_release.py"
-      - "tests/test_validate_published_release.py"
-      - "mise.toml"
-      - ".github/workflows/validate.yml"
 
 concurrency:
-  group: validate-${{ github.event.pull_request.number }}
+  group: validate-${{ github.event_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
-  validate:
+  check-prek:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2.4.4
+        with:
+          cache: false
+
+      - name: Load cached prek environment
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: prek-cache
+        with:
+          path: ~/.cache/prek
+          key: ${{ runner.os }}-prek-${{ hashFiles('**/.pre-commit-config.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-prek-
+
+      - name: Run prek hooks
+        run: |
+          git add .pre-commit-config.yaml
+          mise run format
+
+      - name: Save prek cache
+        if: ${{ always() }}
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/prek
+          key: ${{ runner.os }}-prek-${{ hashFiles('**/.pre-commit-config.yaml') }}
+
+  test-validator:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
-          fetch-depth: 0 # full history needed for diff
 
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
@@ -47,27 +82,76 @@ jobs:
       - name: Test published-release validation
         run: uv run --with pyyaml==6.0.2 python -m unittest discover -s tests
 
+  validate:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0 # full history needed for diff
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+          python-version: "3.13"
+
       - name: Detect changed submission bundles
         id: detect
         run: |
           set -euo pipefail
-          base="origin/${{ github.base_ref }}"
+          pr_workspace="$RUNNER_TEMP/submission-pr"
+          git fetch --no-tags origin "+refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/submission-pr"
+          actual_head="$(git rev-parse refs/remotes/origin/submission-pr)"
+          [ "$actual_head" = "${{ github.event.pull_request.head.sha }}" ] || {
+            echo "PR head changed while this check was starting; rerun it for the new commit."
+            exit 1
+          }
+          git worktree add --detach "$pr_workspace" refs/remotes/origin/submission-pr
           bundles=""
-          while IFS= read -r path; do
-            [ -n "$path" ] || continue
-            # Skip deletions: only validate bundles that still exist.
-            [ -e "$path" ] || continue
-            # Walk up to the nearest ancestor holding a submission.yaml.
-            dir="$path"
-            [ -d "$dir" ] || dir="$(dirname "$dir")"
-            while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
-              if [ -f "$dir/submission.yaml" ]; then
-                bundles="$bundles$dir"$'\n'
-                break
-              fi
-              dir="$(dirname "$dir")"
-            done
-          done < <(git diff --name-only "$base"...HEAD -- 'submissions/**')
+          invalid_paths=0
+          while IFS= read -r -d '' change && IFS= read -r -d '' path; do
+            if [ "$change" != "A" ]; then
+              echo "::error file=$path::Submission bundles are append-only; changes must add files."
+              invalid_paths=1
+              continue
+            fi
+            case "$path" in
+              submissions/*/*) ;;
+              *)
+                echo "::error file=$path::A submission must be a direct child of submissions/."
+                invalid_paths=1
+                continue
+                ;;
+            esac
+            relative_path="${path#submissions/}"
+            bundle_name="${relative_path%%/*}"
+            bundle_file="${relative_path#*/}"
+            if [[ "$bundle_file" == */* ]]; then
+              echo "::error file=$path::Submission bundle files must not be nested."
+              invalid_paths=1
+              continue
+            fi
+            bundle="submissions/$bundle_name"
+            if git cat-file -e "${{ github.event.pull_request.base.sha }}:$bundle" 2>/dev/null; then
+              echo "::error file=$path::Submission bundle $bundle already exists on the base branch."
+              invalid_paths=1
+              continue
+            fi
+            if [ -L "$pr_workspace/$bundle" ] || [ ! -d "$pr_workspace/$bundle" ]; then
+              echo "::error file=$path::Submission bundle $bundle must be a directory, not a symlink."
+              invalid_paths=1
+              continue
+            fi
+            if [ -L "$pr_workspace/$bundle/submission.yaml" ] || [ ! -f "$pr_workspace/$bundle/submission.yaml" ]; then
+              echo "::error file=$path::Submission bundle $bundle must contain a regular submission.yaml file."
+              invalid_paths=1
+              continue
+            fi
+            bundles="$bundles$bundle"$'\n'
+          done < <(git diff --name-status --no-renames -z "${{ github.event.pull_request.base.sha }}"...refs/remotes/origin/submission-pr -- 'submissions/**')
+          [ "$invalid_paths" -eq 0 ] || exit 1
 
           # Dedupe into a stable set, one bundle dir per line.
           bundles="$(printf '%s' "$bundles" | sort -u | sed '/^$/d')"
@@ -86,17 +170,16 @@ jobs:
       - name: Validate submissions
         if: steps.detect.outputs.bundles != ''
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          BUNDLES: ${{ steps.detect.outputs.bundles }}
         run: |
           set -euo pipefail
           status=0
           while IFS= read -r dir; do
             [ -n "$dir" ] || continue
             echo "::group::validate $dir"
-            if ! uv run --with pyyaml==6.0.2 \
-              python scripts/validate_published_release.py "$dir"; then
+            if ! uv run scripts/validate_published_release.py "$RUNNER_TEMP/submission-pr/$dir"; then
               status=1
             fi
             echo "::endgroup::"
-          done <<< "${{ steps.detect.outputs.bundles }}"
+          done <<< "$BUNDLES"
           exit "$status"

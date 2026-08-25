@@ -1,4 +1,10 @@
-#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#   "pyyaml==6.0.2",
+# ]
+# ///
+
 """Validate a submission with the published GPTNT release recorded in its manifest."""
 
 from __future__ import annotations
@@ -25,6 +31,9 @@ ARCHIVE_NAME = "gptnt.tar.gz"
 CHECKSUM_NAME = "gptnt.tar.gz.sha256"
 _GITHUB_API = "https://api.github.com"
 _COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
+_RELEASE_TAG_PATTERN = re.compile(
+    r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+)
 _NETWORK_TIMEOUT_SECONDS = 30
 
 
@@ -110,6 +119,61 @@ def fetch_release(
     )
 
 
+def _commit_from_annotated_tag(tag: str, reference: object, tag_object: object) -> str:
+    """Return an annotated GitHub tag's commit target, rejecting incomplete object data."""
+    reference_object = reference.get("object") if isinstance(reference, dict) else None
+    if not isinstance(reference_object, dict) or reference_object.get("type") != "tag":
+        raise PublishedReleaseValidationError(
+            f"GitHub tag {tag!r} is not an annotated tag"
+        )
+    target = tag_object.get("object") if isinstance(tag_object, dict) else None
+    commit = (
+        target.get("sha")
+        if isinstance(target, dict) and target.get("type") == "commit"
+        else None
+    )
+    if not isinstance(commit, str) or _COMMIT_PATTERN.fullmatch(commit) is None:
+        raise PublishedReleaseValidationError(
+            f"GitHub annotated tag {tag!r} does not target a complete commit SHA"
+        )
+    return commit
+
+
+def fetch_annotated_tag_commit(repository: str, tag: str, *, token: str | None) -> str:
+    """Resolve the published annotated tag through GitHub's Git-object API."""
+    reference_url = f"{_GITHUB_API}/repos/{quote(repository, safe='/')}/git/ref/tags/{quote(tag, safe='')}"
+    try:
+        with urlopen(  # noqa: S310 - fixed GitHub API root
+            _request(reference_url, token=token), timeout=_NETWORK_TIMEOUT_SECONDS
+        ) as response:
+            reference = json.load(response)
+        tag_sha = (
+            reference.get("object", {}).get("sha")
+            if isinstance(reference, dict) and isinstance(reference.get("object"), dict)
+            else None
+        )
+        if not isinstance(tag_sha, str) or _COMMIT_PATTERN.fullmatch(tag_sha) is None:
+            raise PublishedReleaseValidationError(
+                f"GitHub tag {tag!r} has no complete annotated-tag object SHA"
+            )
+        tag_url = (
+            f"{_GITHUB_API}/repos/{quote(repository, safe='/')}/git/tags/{tag_sha}"
+        )
+        with urlopen(  # noqa: S310 - fixed GitHub API root
+            _request(tag_url, token=token), timeout=_NETWORK_TIMEOUT_SECONDS
+        ) as response:
+            tag_object = json.load(response)
+    except HTTPError as error:
+        raise PublishedReleaseValidationError(
+            f"GitHub tag lookup for {tag!r} failed with HTTP {error.code}"
+        ) from error
+    except URLError as error:
+        raise PublishedReleaseValidationError(
+            f"GitHub tag lookup for {tag!r} failed: {error.reason}"
+        ) from error
+    return _commit_from_annotated_tag(tag, reference, tag_object)
+
+
 def read_submission_release(bundle_dir: Path) -> SubmissionRelease:
     """Read the release tag and commit required before the tag-specific validator is installed."""
     manifest_path = bundle_dir / "submission.yaml"
@@ -125,6 +189,10 @@ def read_submission_release(bundle_dir: Path) -> SubmissionRelease:
     if not isinstance(tag, str) or not isinstance(commit, str):
         raise PublishedReleaseValidationError(
             f"{manifest_path} release_tag and release_commit must be strings"
+        )
+    if _RELEASE_TAG_PATTERN.fullmatch(tag) is None:
+        raise PublishedReleaseValidationError(
+            f"{manifest_path} release_tag {tag!r} is not a vMAJOR.MINOR.PATCH release"
         )
     if _COMMIT_PATTERN.fullmatch(commit) is None:
         raise PublishedReleaseValidationError(
@@ -189,7 +257,12 @@ def _verify_checksum(archive: Path, checksum: Path) -> None:
 def _git(repository: Path, *arguments: str) -> str:
     try:
         result = subprocess.run(
-            ["git", "-C", os.fspath(repository), *arguments],
+            [
+                "git",
+                f"--git-dir={repository / '.git'}",
+                f"--work-tree={repository}",
+                *arguments,
+            ],
             check=True,
             capture_output=True,
             text=True,
@@ -208,6 +281,8 @@ def _verify_embedded_release(repository: Path, submitted: SubmissionRelease) -> 
     embedded_tag = _git(repository, "describe", "--tags", "--exact-match")
     embedded_commit = _git(repository, "rev-parse", "HEAD")
     tag_commit = _git(repository, "rev-parse", f"{submitted.tag}^{{commit}}")
+    tag_tree = _git(repository, "rev-parse", f"{submitted.tag}^{{tree}}")
+    working_tree = _git(repository, "rev-parse", "HEAD^{tree}")
     tag_type = _git(repository, "cat-file", "-t", f"refs/tags/{submitted.tag}")
 
     if embedded_tag != submitted.tag or tag_type != "tag":
@@ -218,22 +293,73 @@ def _verify_embedded_release(repository: Path, submitted: SubmissionRelease) -> 
         raise PublishedReleaseValidationError(
             f"Embedded release_commit {embedded_commit!r} does not match {submitted.commit!r}"
         )
+    if tag_tree != working_tree or _git(
+        repository,
+        "status",
+        "--porcelain",
+        "--ignored=matching",
+        "--untracked-files=all",
+    ):
+        raise PublishedReleaseValidationError(
+            f"Embedded release tree does not match its tag tree for {submitted.tag!r}"
+        )
+
+
+def _release_environment() -> dict[str, str]:
+    """Return the process environment without path overrides for the verified release."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"CONFIGS", "GITHUB_TOKEN", "ROOT"}
+    }
+
+
+def _reject_bundle_symlinks(bundle_dir: Path) -> None:
+    """Reject a bundle that contains a symlink before a released validator reads it."""
+    if bundle_dir.is_symlink() or any(
+        path.is_symlink() for path in bundle_dir.rglob("*")
+    ):
+        raise PublishedReleaseValidationError(
+            f"Submission bundle {bundle_dir} contains a symlink"
+        )
 
 
 def _run_validator(repository: Path, bundle_dir: Path) -> None:
     subprocess.run(
         [
-            "uvx",
-            "--from",
+            "uv",
+            "run",
+            "--frozen",
+            "--project",
+            os.fspath(repository),
+            "gptnt",
+            "suite",
+            "freeze",
+            "--check",
+            "--force",
+        ],
+        check=True,
+        cwd=repository,
+        env=_release_environment(),
+    )
+    subprocess.run(
+        [
+            "uv",
+            "run",
+            "--frozen",
+            "--project",
             os.fspath(repository),
             "gptnt",
             "submission",
             "validate",
+            "--require-installed-lock-match",
             "--format",
             "github",
             os.fspath(bundle_dir.resolve()),
         ],
         check=True,
+        cwd=repository,
+        env=_release_environment(),
     )
 
 
@@ -245,6 +371,7 @@ def validate_published_release(
     validator: Callable[[Path, Path], None] = _run_validator,
 ) -> SubmissionRelease:
     """Verify and run the validator from the bundle's published GPTNT release."""
+    _reject_bundle_symlinks(bundle_dir)
     submitted = read_submission_release(bundle_dir)
     published = _require_published_release(release, expected_tag=submitted.tag)
 
@@ -287,10 +414,17 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(arguments: Sequence[str] | None = None) -> None:
     options = _parser().parse_args(arguments)
-    token = os.environ.get("GITHUB_TOKEN")
     try:
         submitted = read_submission_release(options.bundle)
-        release = fetch_release(options.repository, submitted.tag, token=token)
+        remote_tag_commit = fetch_annotated_tag_commit(
+            options.repository, submitted.tag, token=None
+        )
+        if remote_tag_commit != submitted.commit:
+            raise PublishedReleaseValidationError(
+                f"GitHub tag {submitted.tag!r} targets {remote_tag_commit}, "
+                f"not submission commit {submitted.commit}"
+            )
+        release = fetch_release(options.repository, submitted.tag, token=None)
         with tempfile.TemporaryDirectory(
             prefix="gptnt-published-release-"
         ) as temporary:

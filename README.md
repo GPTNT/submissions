@@ -2,11 +2,13 @@
 
 This repo is the central location for submitting new results to the [GPTNT Leaderboard](https://gptnt.github.io/leaderboard).
 
-
 ## Submitting
 
-Each PR adds one submission bundle under `submissions/`, a flat folder named `submissions/YYYYMMDD_<display-slug>_<capfp8>_<suite>_<ver>/`. One model measured across several suites is several bundles, so several PRs — submit as many complete bundles as you like. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full layout and the `gptnt submission new` → `submit` flow.
-
+Each PR adds one submission bundle under `submissions/`. Its folder name is
+`submissions/YYYYMMDD_<display-slug>_<capfp8>_<suite>_<ver>/`. One model
+measured across several suites creates several bundles and therefore several
+PRs. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full layout and the
+`gptnt submission new` to `submit` flow.
 
 ## Inspiration
 

@@ -1,0 +1,173 @@
+# yaml-language-server: $schema=https://www.schemastore.org/prek.json
+
+default_install_hook_types: ["commit-msg", "pre-commit"]
+
+exclude:
+  glob:
+    - submissions/**
+
+repos:
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.18.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+  - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
+    rev: "3.11.1"
+    hooks:
+      - id: editorconfig-checker
+        # Disabled indentation check because it conflicts with docstrings
+        args: ["-disable-indentation"]
+        priority: 0
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: name-tests-test
+        args: [--pytest-test-first]
+        priority: 0
+        exclude: ^tests/(_.+|.*/_)
+      - id: check-merge-conflict
+        priority: 0
+      - id: check-vcs-permalinks
+        priority: 0
+      - id: detect-private-key
+        priority: 0
+      - id: check-case-conflict
+        priority: 0
+      - id: check-symlinks
+        priority: 0
+      - id: destroyed-symlinks
+        priority: 0
+      - id: check-toml
+        priority: 0
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+        priority: 0
+      - id: check-illegal-windows-names
+        priority: 0
+      - id: end-of-file-fixer
+        types: [text]
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        types: [text]
+      - id: mixed-line-ending
+      - id: fix-byte-order-marker
+
+  - repo: https://github.com/kjanat/actionlint
+    rev: v1.10.0
+    hooks:
+      - id: actionlint
+        priority: 0
+
+  - repo: https://github.com/sirosen/texthooks
+    rev: 0.7.1
+    hooks:
+      - id: fix-smartquotes
+        exclude: ^[^/]*\.lock$
+      - id: fix-spaces
+        exclude: ^[^/]*\.lock$
+      - id: fix-ligatures
+        exclude: ^[^/]*\.lock$
+
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.29.0
+    hooks:
+      - id: zizmor
+        priority: 0
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1-1
+    hooks:
+      - id: shellcheck
+        priority: 0
+
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.13.1-1
+    hooks:
+      - id: shfmt
+
+  - repo: https://github.com/pappasam/toml-sort
+    rev: "v0.24.4"
+    hooks:
+      - id: toml-sort
+        args: [--in-place]
+        exclude: ^[^/]*\.lock$
+
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.9.6
+    hooks:
+      - id: prettier
+        types_or: [html, javascript, yaml, json, markdown]
+
+  - repo: https://github.com/vale-cli/vale
+    rev: v3.17.0
+    hooks:
+      - id: vale
+        name: vale sync
+        pass_filenames: false
+        args: [sync]
+        priority: 0
+      - id: vale
+        args: [--output=line, --minAlertLevel=error]
+        priority: 1
+
+  # - repo: local
+  #   hooks:
+  #     - id: no-rst-syntax
+  #       name: No RST syntax (use Markdown in docstrings and docs)
+  #       description: |
+  #         Bans RST-only constructs that mkdocstrings/Markdown won't render.
+  #       language: pygrep
+  #       entry: '(?<!`)``(?!`)|::\s*$'
+  #       types_or: [python, markdown]
+  #       priority: 0
+
+  #     - id: docformatter
+  #       name: docformatter
+  #       language: system
+  #       entry: uv run docformatter --in-place --wrap-summaries=0 --wrap-descriptions=99
+  #       types_or: [python, pyi, jupyter]
+
+  #     - id: ruff-lint
+  #       name: ruff linter
+  #       entry: uv run ruff check --fix --exit-non-zero-on-fix
+  #       types_or: [python, pyi, jupyter]
+  #       language: system
+
+  #     - id: ruff-format
+  #       name: ruff format
+  #       entry: uv run ruff format
+  #       types_or: [python, pyi, jupyter]
+  #       language: system
+
+  #     - id: wemake-python-styleguide
+  #       name: wemake-python-styleguide
+  #       entry: uv run flake8
+  #       types_or: [python, jupyter]
+  #       language: system
+  #       priority: 20
+
+  #     - id: basedpyright
+  #       name: basedpyright
+  #       entry: uv run basedpyright
+  #       types_or: [python, pyi, jupyter]
+  #       language: system
+  #       priority: 20
+
+  #     - id: import-linter
+  #       name: import-linter
+  #       entry: uv run lint-imports
+  #       language: system
+  #       types: [python]
+  #       pass_filenames: false
+  #       priority: 20
+
+  #     - id: creosote
+  #       name: creosote
+  #       entry: uv run creosote
+  #       pass_filenames: false
+  #       files: \.(py|toml|txt|in|lock|ipynb)$
+  #       language: system
+  #       priority: 20
