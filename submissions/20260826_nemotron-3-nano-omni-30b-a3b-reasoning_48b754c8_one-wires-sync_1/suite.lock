@@ -1,0 +1,124 @@
+version = 3
+
+[[suite]]
+name = "one-wires-sync"
+revision = 1
+modality = ["language", "vision"]
+missions_path = "configs/missions/one_wires"
+manual_rule_seed = 1
+suite_digest = "652fa79d3d7d320dfcde0a97014f097e"
+frozen_at = "2026-08-25T20:55:13.578123Z"
+gptnt_version = "1.1.2.dev59+42449238"
+git_sha = "25e82b70dcbbca826f61d6ba97cb22ffd474ea1c"
+
+[[suite.missions]]
+mission_key = "845|1|Wires"
+digest = "1737a02ab352b34a21fa067f3ac46d8d"
+
+[suite.defuser_protocol]
+role = "defuser"
+communication_style = "sync"
+is_playing_alone = false
+include_manual = false
+receive_feedback_after_action = false
+allow_magic_actions = false
+allow_lottery_actions = false
+allow_message_output = true
+
+[suite.expert_protocol]
+role = "expert"
+communication_style = "sync"
+is_playing_alone = false
+include_manual = true
+receive_feedback_after_action = false
+allow_magic_actions = false
+allow_lottery_actions = false
+allow_message_output = true
+
+[suite.matchup]
+pairing_type = "pairwise"
+
+[suite.manual_profile]
+include_frontmatter = false
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "Wires"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "BigButton"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "Keypad"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "Simon"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "WhosOnFirst"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "Memory"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "Morse"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "Venn"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "WireSequence"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "Maze"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "Password"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "IndicatorWidget"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "BatteryWidget"
+language = "en"
+
+[[suite.manual_profile.documents]]
+source = "ktanecontent"
+id = "PortWidget"
+language = "en"
+
+[[mission]]
+seed = 845
+ruleSeed = 1
+timeLimit = 81
+numStrikes = 3
+components = ["Wires"]
+optWidgets = 3
+needyTime = 60
+isFront = true
+timeScale = 1.0
+timeStepSize = 3000
