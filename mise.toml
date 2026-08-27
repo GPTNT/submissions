@@ -1,20 +1,19 @@
-[tools]
-python = "3.13"
+[tasks.format]
+description = "Run Prek hooks across non-submission files."
+run = "prek run --color=always --all-files"
+
+[tasks.tests]
+description = "Test the published-release validator."
+run = "uv run --with pyyaml==6.0.2 python -m unittest discover -s tests"
 
 [tasks.validate]
 description = "Validate a submission bundle locally, as CI does."
 usage = '''
 arg "<dir>" help="Path to the submission bundle directory"
 '''
-run = '''uv run --with pyyaml==6.0.2 python scripts/validate_published_release.py "{{arg(name="dir")}}"'''
+run = '''uv run scripts/validate_published_release.py "{{arg(name="dir")}}"'''
 
-[tasks.tests]
-description = "Test the published-release validator."
-run = "uv run --with pyyaml==6.0.2 python -m unittest discover -s tests"
-
-[tasks.format]
-description = "Format and check the repository Python."
-run = [
-  "uvx --from ruff==0.15.18 ruff format scripts tests",
-  "uvx --from ruff==0.15.18 ruff check scripts tests",
-]
+[tools]
+prek = "latest"
+python = "3.13"
+uv = "latest"

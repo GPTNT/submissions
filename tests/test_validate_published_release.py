@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import subprocess
 import tarfile
 import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -15,6 +17,10 @@ from scripts.validate_published_release import (
     CHECKSUM_NAME,
     PublishedRelease,
     PublishedReleaseValidationError,
+    _commit_from_annotated_tag,
+    _run_validator,
+    _verify_embedded_release,
+    read_submission_release,
     validate_published_release,
 )
 
@@ -131,3 +137,83 @@ class PublishedReleaseValidationTests(unittest.TestCase):
                             "validator ran"
                         ),
                     )
+
+    def test_release_validator_requires_the_installed_lock_match(self) -> None:
+        """The released validator compares each bundle to its installed suite registry."""
+        with (
+            patch.dict(os.environ, {"GITHUB_TOKEN": "private-token"}),
+            patch("scripts.validate_published_release.subprocess.run") as run,
+        ):
+            _run_validator(self.release_repository, self.bundle)
+
+        self.assertEqual(run.call_count, 2)
+        freeze_command = run.call_args_list[0].args[0]
+        validate_command = run.call_args_list[1].args[0]
+        expected_prefix = [
+            "uv",
+            "run",
+            "--frozen",
+            "--project",
+            str(self.release_repository),
+            "gptnt",
+        ]
+        self.assertEqual(freeze_command[:6], expected_prefix)
+        self.assertEqual(validate_command[:6], expected_prefix)
+        self.assertEqual(freeze_command[-4:], ["suite", "freeze", "--check", "--force"])
+        self.assertIn("--require-installed-lock-match", validate_command)
+        for call in run.call_args_list:
+            self.assertEqual(call.kwargs["cwd"], self.release_repository)
+            self.assertNotIn("CONFIGS", call.kwargs["env"])
+            self.assertNotIn("ROOT", call.kwargs["env"])
+            self.assertNotIn("GITHUB_TOKEN", call.kwargs["env"])
+
+    def test_rejects_a_bundle_that_contains_a_symlink(self) -> None:
+        """A submission bundle must not make the released validator read outside the bundle."""
+        outside_file = self.root / "outside.txt"
+        outside_file.write_text("outside")
+        (self.bundle / "linked.txt").symlink_to(outside_file)
+
+        with self.assertRaisesRegex(PublishedReleaseValidationError, "symlink"):
+            validate_published_release(
+                self.bundle,
+                release=self.release,
+                workspace=self.root / "symlink",
+                validator=lambda _repository, _bundle: self.fail("validator ran"),
+            )
+
+    def test_rejects_a_non_release_tag(self) -> None:
+        """Submission provenance must select a normal GPTNT release tag."""
+        self._write_manifest(self.release_commit)
+        manifest_path = self.bundle / "submission.yaml"
+        manifest = yaml.safe_load(manifest_path.read_text())
+        manifest["provenance"]["release_tag"] = "nightly"
+        manifest_path.write_text(yaml.safe_dump(manifest))
+
+        with self.assertRaisesRegex(PublishedReleaseValidationError, "release_tag"):
+            read_submission_release(self.bundle)
+
+    def test_annotated_tag_must_resolve_to_a_complete_commit(self) -> None:
+        """The remote Git reference is an independent release-asset trust anchor."""
+        reference = {"object": {"type": "tag", "sha": "a" * 40}}
+        tag_object = {"object": {"type": "commit", "sha": self.release_commit}}
+
+        assert (
+            _commit_from_annotated_tag(_TAG, reference, tag_object)
+            == self.release_commit
+        )
+        with self.assertRaisesRegex(PublishedReleaseValidationError, "annotated tag"):
+            _commit_from_annotated_tag(_TAG, {"object": {"type": "commit"}}, tag_object)
+        with self.assertRaisesRegex(PublishedReleaseValidationError, "complete commit"):
+            _commit_from_annotated_tag(
+                _TAG, reference, {"object": {"type": "commit", "sha": "short"}}
+            )
+
+    def test_rejects_an_embedded_release_tree_that_is_not_its_tag(self) -> None:
+        """The release archive must contain exactly the remote tag's source tree."""
+        (self.release_repository / "injected.py").write_text("raise RuntimeError\n")
+        submitted = read_submission_release(self.bundle)
+
+        with self.assertRaisesRegex(
+            PublishedReleaseValidationError, "does not match its tag tree"
+        ):
+            _verify_embedded_release(self.release_repository, submitted)
