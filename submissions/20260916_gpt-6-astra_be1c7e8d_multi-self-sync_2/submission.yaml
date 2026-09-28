@@ -1,0 +1,89 @@
+schema_version: 4
+submission_id: 2026-09-16_gpt-6-astra_be1c7e8d_multi-self-sync@2
+measured:
+  suite_name: multi-self-sync
+  suite_revision: 2
+  suite_digest: 60442c8584914bb230f452902f952e52
+submitter:
+  name: Sabrina McCallum
+  contact: s.mccallum-exner@ed.ac.uk
+  affiliation: UoE
+players:
+- role: defuser
+  capabilities:
+    player_name: gpt-6-astra
+    player_type: ai
+    thinking_method: inner-monologue
+    structured_output_mode: native
+    include_schema_in_instructions: false
+    max_observations_per_request: 16
+    usage_limits:
+      request_limit: 50
+      tool_calls_limit: null
+      input_tokens_limit: 922000
+      output_tokens_limit: 128000
+      total_tokens_limit: null
+      count_tokens_before_request: false
+    image_dimensions:
+      width: 640
+      height: 480
+    tokens_per_image: 362
+    interaction_location_method: set-of-marks
+    coordinate_mode: absolute
+    coordinate_scale: null
+    preserve_last_frame_for_n_turns: 1
+    enable_nobf_generation: true
+    model_settings:
+      max_tokens: 1000
+      temperature: null
+      openai_reasoning_effort: high
+      openai_reasoning_summary: auto
+  identity:
+    display_name: GPT-6 Astra
+    organisation: OpenAI
+    is_os_model: false
+    url: https://developers.openai.com/api/docs/models/gpt-6-astra
+  fingerprint: be1c7e8d06343281d1191716a4460d12
+- role: expert
+  capabilities:
+    player_name: gpt-6-astra
+    player_type: ai
+    thinking_method: inner-monologue
+    structured_output_mode: native
+    include_schema_in_instructions: false
+    max_observations_per_request: 16
+    usage_limits:
+      request_limit: 50
+      tool_calls_limit: null
+      input_tokens_limit: 922000
+      output_tokens_limit: 128000
+      total_tokens_limit: null
+      count_tokens_before_request: false
+    image_dimensions:
+      width: 640
+      height: 480
+    tokens_per_image: 362
+    interaction_location_method: set-of-marks
+    coordinate_mode: absolute
+    coordinate_scale: null
+    preserve_last_frame_for_n_turns: 1
+    enable_nobf_generation: true
+    model_settings:
+      max_tokens: 1000
+      temperature: null
+      openai_reasoning_effort: high
+      openai_reasoning_summary: auto
+  identity:
+    display_name: GPT-6 Astra
+    organisation: OpenAI
+    is_os_model: false
+    url: https://developers.openai.com/api/docs/models/gpt-6-astra
+  fingerprint: be1c7e8d06343281d1191716a4460d12
+provenance:
+  gptnt_version: 2.1.1
+  release_commit: 2cb6082285e452804ca0bf61ea1e8a58481a4bf4
+  release_tag: v2.1.1
+  release_protected_content_digest: sha256:66810d669dedefcc593e8e55dcc8df018f77b9077192c65129cbdcc253920a31
+  protected_content_digest: sha256:66810d669dedefcc593e8e55dcc8df018f77b9077192c65129cbdcc253920a31
+  protected_content_modified: false
+run_date: '2026-09-16T09:36:50.28946461Z'
