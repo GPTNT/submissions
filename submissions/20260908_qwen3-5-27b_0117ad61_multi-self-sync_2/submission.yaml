@@ -1,0 +1,85 @@
+schema_version: 4
+submission_id: 2026-09-08_qwen3-5-27b_0117ad61_multi-self-sync@2
+measured:
+  suite_name: multi-self-sync
+  suite_revision: 2
+  suite_digest: 60442c8584914bb230f452902f952e52
+submitter:
+  name: Sabrina McCallum
+  contact: s.mccallum-exner@ed.ac.uk
+  affiliation: UoE
+players:
+- role: defuser
+  capabilities:
+    player_name: qwen3-5-27b
+    player_type: ai
+    thinking_method: thinking-out-loud
+    structured_output_mode: null
+    include_schema_in_instructions: true
+    max_observations_per_request: 16
+    usage_limits:
+      request_limit: 50
+      tool_calls_limit: null
+      input_tokens_limit: 126999
+      output_tokens_limit: 1001
+      total_tokens_limit: null
+      count_tokens_before_request: false
+    image_dimensions:
+      width: 504
+      height: 504
+    tokens_per_image: 266
+    interaction_location_method: set-of-marks
+    coordinate_mode: normalised
+    coordinate_scale: 1000
+    preserve_last_frame_for_n_turns: 1
+    enable_nobf_generation: true
+    model_settings:
+      max_tokens: 1000
+      temperature: 0.6
+  identity:
+    display_name: Qwen3.5 (27B)
+    organisation: Qwen
+    is_os_model: true
+    url: https://huggingface.co/Qwen/Qwen3.5-27B
+  fingerprint: 0117ad6179e70f1fed7b33dcfc0359ba
+- role: expert
+  capabilities:
+    player_name: qwen3-5-27b
+    player_type: ai
+    thinking_method: thinking-out-loud
+    structured_output_mode: null
+    include_schema_in_instructions: true
+    max_observations_per_request: 16
+    usage_limits:
+      request_limit: 50
+      tool_calls_limit: null
+      input_tokens_limit: 126999
+      output_tokens_limit: 1001
+      total_tokens_limit: null
+      count_tokens_before_request: false
+    image_dimensions:
+      width: 504
+      height: 504
+    tokens_per_image: 266
+    interaction_location_method: set-of-marks
+    coordinate_mode: normalised
+    coordinate_scale: 1000
+    preserve_last_frame_for_n_turns: 1
+    enable_nobf_generation: true
+    model_settings:
+      max_tokens: 1000
+      temperature: 0.6
+  identity:
+    display_name: Qwen3.5 (27B)
+    organisation: Qwen
+    is_os_model: true
+    url: https://huggingface.co/Qwen/Qwen3.5-27B
+  fingerprint: 0117ad6179e70f1fed7b33dcfc0359ba
+provenance:
+  gptnt_version: 2.1.1
+  release_commit: 2cb6082285e452804ca0bf61ea1e8a58481a4bf4
+  release_tag: v2.1.1
+  release_protected_content_digest: sha256:66810d669dedefcc593e8e55dcc8df018f77b9077192c65129cbdcc253920a31
+  protected_content_digest: sha256:66810d669dedefcc593e8e55dcc8df018f77b9077192c65129cbdcc253920a31
+  protected_content_modified: false
+run_date: '2026-09-08T20:41:45.100376227Z'
