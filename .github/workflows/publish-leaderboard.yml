@@ -43,7 +43,7 @@ jobs:
           uv tool install "gptnt @ git+https://github.com/GPTNT/gptnt.git@${GPTNT_LEADERBOARD_RELEASE_REF}"
           gptnt leaderboard build . \
             --output "$RUNNER_TEMP/leaderboard.generated.json" \
-            --generated-from "${GITHUB_REPOSITORY}@${GITHUB_SHA}"
+            --generated-from "GPTNT/submissions"
 
       - name: Create or update the website data pull request
         id: website-pr
@@ -79,7 +79,7 @@ jobs:
               --base main \
               --head "$branch" \
               --title "Update generated leaderboard data" \
-              --body "Automated artifact built from ${GITHUB_REPOSITORY}@${GITHUB_SHA}.")"
+              --body "Automated artifact built from the merged GPTNT/submissions checkout.")"
           fi
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
