@@ -23,9 +23,8 @@ Before enabling the workflow, configure these repository settings:
   contains `gptnt leaderboard build`.
 - `WEBSITE_PR_TOKEN` secret: a least-privilege token with contents and pull-request write access
   to `GPTNT/gptnt.github.io`.
-- `RESEND_API_KEY`, `LEADERBOARD_NOTIFICATION_FROM`, and `LEADERBOARD_NOTIFICATION_TO` secrets:
-  a Resend API key, verified sender, and maintainer recipient. The workflow emails maintainers
-  only when validation or publication fails, or when it opens or updates the website pull request.
+- Configure GitHub notifications for this repository and `GPTNT/gptnt.github.io` to receive pull
+  request and Actions updates. The publication workflow does not use an external email provider.
 
 ## Inspiration
 
