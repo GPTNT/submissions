@@ -416,15 +416,16 @@ def main(arguments: Sequence[str] | None = None) -> None:
     options = _parser().parse_args(arguments)
     try:
         submitted = read_submission_release(options.bundle)
+        token = os.environ.get("GITHUB_TOKEN")
         remote_tag_commit = fetch_annotated_tag_commit(
-            options.repository, submitted.tag, token=None
+            options.repository, submitted.tag, token=token
         )
         if remote_tag_commit != submitted.commit:
             raise PublishedReleaseValidationError(
                 f"GitHub tag {submitted.tag!r} targets {remote_tag_commit}, "
                 f"not submission commit {submitted.commit}"
             )
-        release = fetch_release(options.repository, submitted.tag, token=None)
+        release = fetch_release(options.repository, submitted.tag, token=token)
         with tempfile.TemporaryDirectory(
             prefix="gptnt-published-release-"
         ) as temporary:

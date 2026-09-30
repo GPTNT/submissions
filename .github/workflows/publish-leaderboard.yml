@@ -1,0 +1,85 @@
+name: publish leaderboard
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "submissions/**"
+  workflow_dispatch:
+
+concurrency:
+  group: publish-leaderboard
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.website-pr.outputs.changed }}
+      pr_url: ${{ steps.website-pr.outputs.pr_url }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Build leaderboard artifact from merged submissions
+        env:
+          GPTNT_LEADERBOARD_RELEASE_REF: ${{ vars.GPTNT_LEADERBOARD_RELEASE_REF }}
+        run: |
+          set -euo pipefail
+          [ -n "$GPTNT_LEADERBOARD_RELEASE_REF" ] || {
+            echo "::error::Set the GPTNT_LEADERBOARD_RELEASE_REF repository variable to a released GPTNT tag or commit."
+            exit 1
+          }
+          uv tool install "gptnt @ git+https://github.com/GPTNT/gptnt.git@${GPTNT_LEADERBOARD_RELEASE_REF}"
+          gptnt leaderboard build . \
+            --output "$RUNNER_TEMP/leaderboard.generated.json" \
+            --generated-from "GPTNT/submissions"
+
+      - name: Create or update the website data pull request
+        id: website-pr
+        env:
+          WEBSITE_PR_TOKEN: ${{ secrets.WEBSITE_PR_TOKEN }}
+        run: |
+          set -euo pipefail
+          [ -n "$WEBSITE_PR_TOKEN" ] || {
+            echo "::error::Set the WEBSITE_PR_TOKEN secret before enabling leaderboard publication."
+            exit 1
+          }
+          website="$RUNNER_TEMP/gptnt-website"
+          branch="automation/leaderboard-data"
+          git clone --depth 1 "https://x-access-token:${WEBSITE_PR_TOKEN}@github.com/GPTNT/gptnt.github.io.git" "$website"
+          cp "$RUNNER_TEMP/leaderboard.generated.json" "$website/src/data/leaderboard.generated.json"
+          cd "$website"
+          if git diff --quiet -- src/data/leaderboard.generated.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "pr_url=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "gptnt-leaderboard-bot"
+          git config user.email "gptnt-leaderboard-bot@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add src/data/leaderboard.generated.json
+          git commit -m "chore: update generated leaderboard data"
+          git push --force origin "$branch"
+          export GH_TOKEN="$WEBSITE_PR_TOKEN"
+          pr_url="$(gh pr list --repo GPTNT/gptnt.github.io --head "$branch" --state open --json url --jq '.[0].url')"
+          if [ -z "$pr_url" ]; then
+            pr_url="$(gh pr create \
+              --repo GPTNT/gptnt.github.io \
+              --base main \
+              --head "$branch" \
+              --title "Update generated leaderboard data" \
+              --body "Automated artifact built from the merged GPTNT/submissions checkout.")"
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"

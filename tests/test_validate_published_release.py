@@ -20,6 +20,7 @@ from scripts.validate_published_release import (
     _commit_from_annotated_tag,
     _run_validator,
     _verify_embedded_release,
+    main,
     read_submission_release,
     validate_published_release,
 )
@@ -166,6 +167,23 @@ class PublishedReleaseValidationTests(unittest.TestCase):
             self.assertNotIn("CONFIGS", call.kwargs["env"])
             self.assertNotIn("ROOT", call.kwargs["env"])
             self.assertNotIn("GITHUB_TOKEN", call.kwargs["env"])
+
+    def test_main_uses_ci_token_for_github_metadata_only(self) -> None:
+        with (
+            patch.dict(os.environ, {"GITHUB_TOKEN": "ci-token"}),
+            patch(
+                "scripts.validate_published_release.fetch_annotated_tag_commit",
+                return_value=self.release_commit,
+            ) as fetch_tag,
+            patch(
+                "scripts.validate_published_release.fetch_release", return_value=self.release
+            ) as fetch_release,
+            patch("scripts.validate_published_release.validate_published_release"),
+        ):
+            main([str(self.bundle)])
+
+        self.assertEqual(fetch_tag.call_args.kwargs["token"], "ci-token")
+        self.assertEqual(fetch_release.call_args.kwargs["token"], "ci-token")
 
     def test_rejects_a_bundle_that_contains_a_symlink(self) -> None:
         """A submission bundle must not make the released validator read outside the bundle."""

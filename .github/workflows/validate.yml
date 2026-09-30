@@ -171,6 +171,7 @@ jobs:
         if: steps.detect.outputs.bundles != ''
         env:
           BUNDLES: ${{ steps.detect.outputs.bundles }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           status=0
